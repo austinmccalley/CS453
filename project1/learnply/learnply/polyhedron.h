@@ -80,6 +80,8 @@ public:
 	Vertex **vlist;    /* list of vertices */
 	int nverts;
 	int max_verts;
+	int maxScalar;
+	int minScalar;
 
 	Edge **elist;      /* list of edges */
 	int nedges;

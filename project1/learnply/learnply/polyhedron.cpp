@@ -53,6 +53,8 @@ Polyhedron::Polyhedron(FILE *file)
 
 			vert_other = get_other_properties_ply(in_ply,
 				offsetof(Vertex_io, other_props));
+			maxScalar = 0;
+			minScalar = 2147483647;
 
 			/* grab all the vertex elements */
 			for (j = 0; j < nverts; j++) {
@@ -66,6 +68,16 @@ Polyhedron::Polyhedron(FILE *file)
 				vlist[j]->vz = vert.vz;
 
 				vlist[j]->scalar = vert.s;
+				
+				// Calculate min/max scalar
+				if (vert.s < minScalar) {
+					minScalar = vert.s;
+				}
+				if (vert.s > maxScalar) {
+					maxScalar = vert.s;
+				}
+
+				
 
 				vlist[j]->other_props = vert.other_props;
 			}
