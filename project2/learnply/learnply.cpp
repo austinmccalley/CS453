@@ -49,6 +49,8 @@ double zoom = 1.0;
 double translation[2] = { 0, 0 };
 int mouse_mode = -2;	// -1 = no action, 1 = tranlate y, 2 = rotate
 
+int N = 45;
+
 // IBFV related variables (Van Wijk 2002)
 //https://www.win.tue.nl/~vanwijk/ibfv/
 #define NPN		64
@@ -90,7 +92,7 @@ Main program.
 int main(int argc, char* argv[])
 {
 	/*load mesh from ply file*/
-	FILE* this_file = fopen("../data/scalar_data/r4.ply", "r");
+	FILE* this_file = fopen("../data/scalar_data/r14.ply", "r");
 	poly = new Polyhedron(this_file);
 	fclose(this_file);
 	
@@ -495,6 +497,8 @@ void connectCP(double s) {
 			double closestDelta = 9999999;
 			icVector3* p1 = NULL;
 			icVector3* p2 = NULL;
+			int p1I = -1;
+			int p2I = -1;
 
 			for (int j = 0; j < 4; j++) {
 				for (int k = 0; k < 4; k++) {
@@ -503,6 +507,7 @@ void connectCP(double s) {
 						icVector3* cp2 = crossPoints[k];
 
 						if (dot(*cp1, *cp2) == 0) {
+							std::cout << "HIT INTERSECTION" << std::endl;
 							continue;
 						}
 
@@ -518,16 +523,24 @@ void connectCP(double s) {
 							closestDelta = delta;
 							p1 = cp1;
 							p2 = cp2;
+						} else {
+							p1I = j;
+							p2I = k;
 						}
-						
 					}
 				}
 			}
+
+			icVector3* cp3 = crossPoints[p1I];
+			icVector3* cp4 = crossPoints[p2I];
+
+			LineSegment line2(cp3->x, cp3->y, cp3->z, cp4->x, cp4->y, cp4->z);
 
 
 			if (p1 && p2) {
 				LineSegment line(p1->x, p1->y, p1->z, p2->x, p2->y, p2->z);
 				plCountour.push_back(line);
+				plCountour.push_back(line2);
 			}
 			break;
 		}
@@ -602,7 +615,6 @@ void keyboard(unsigned char key, int x, int y) {
 	case '6':	// add your own display mode
 		display_mode = 6;
 		{
-			int N = 30;
 
 			int deltaScaled = (poly->maxScalar - poly->minScalar) / N;
 
@@ -623,9 +635,8 @@ void keyboard(unsigned char key, int x, int y) {
 		break;
 
 	case '7':	// add your own display mode
-		display_mode = 6;
+		display_mode = 7;
 		{
-			int N = 30;
 
 			int deltaScaled = (poly->maxScalar - poly->minScalar) / N;
 
@@ -1206,7 +1217,62 @@ void display_polyhedron(Polyhedron* poly)
 		// draw lines
 		for (int k = 0; k < lines.size(); k++)
 		{
-			drawPolyLine(lines[k], 1.0, 1.0, 0.0, 0.0);
+			PolyLine line = lines[k];
+			double val = 1 - (double)(k + 1) / (double)lines.size();
+			
+			double rVal = 1 * val + 1 * val;
+			double gVal = 1 * val + 0 * val;
+			double bVal = 0 * val + 0 * val;
+
+
+			drawPolyLine(line, 1.0, rVal, gVal, bVal);
+		}
+
+		// draw points
+		for (int k = 0; k < points.size(); k++)
+		{
+			icVector3 point = points[k];
+			drawDot(point.x, point.y, point.z);
+		}
+		break;
+	}
+	break;
+	case 8: // add your own display mode
+	{
+		glEnable(GL_LIGHTING);
+		glEnable(GL_LIGHT0);
+		glEnable(GL_LIGHT1);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		GLfloat mat_diffuse[4] = { 0.24, 0.4, 0.47, 0.0 };
+		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+
+		for (int i = 0; i < poly->nquads; i++) {
+			Quad* temp_q = poly->qlist[i];
+			glBegin(GL_POLYGON);
+			for (int j = 0; j < 4; j++) {
+				Vertex* temp_v = temp_q->verts[j];
+				glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
+				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+			}
+			glEnd();
+		}
+
+		// draw lines
+		for (int k = 0; k < lines.size(); k++)
+		{
+			PolyLine line = lines[k];
+			double val = 1 - (double)(k + 1) / (double)lines.size();
+
+			double rVal = 1 * val + 1 * val;
+			double gVal = 1 * val + 0 * val;
+			double bVal = 0 * val + 0 * val;
+
+
+			drawPolyLine(line, 1.0, rVal, gVal, bVal);
 		}
 
 		// draw points
