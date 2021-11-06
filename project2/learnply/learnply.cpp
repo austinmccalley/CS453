@@ -49,7 +49,9 @@ double zoom = 1.0;
 double translation[2] = { 0, 0 };
 int mouse_mode = -2;	// -1 = no action, 1 = tranlate y, 2 = rotate
 
-int N = 45;
+int N = 50;
+int SCALE_MIN = 0;
+int SCALE_MAX = 25;
 
 // IBFV related variables (Van Wijk 2002)
 //https://www.win.tue.nl/~vanwijk/ibfv/
@@ -421,13 +423,23 @@ void classifyVector(double s) {
 	}
 }
 
-void calcCrossingPoints(double s) {
+void calcCrossingPoints(double s, int z) {
 
 		/* Calculate crossing points */
 		for (int i = 0; i < poly->nedges; i++) {
 			Edge* eTemp = poly->elist[i];
 			Vertex* v1 = eTemp->verts[0];
 			Vertex* v2 = eTemp->verts[1];
+
+			int a = SCALE_MIN;
+			int b = SCALE_MAX;
+			int dba = b - a;
+			int scalarDiff = poly->maxScalar - poly->minScalar;
+
+			if (z == 1) {
+				v1->z = dba * ((v1->scalar - poly->minScalar) / scalarDiff) + a;
+				v2->z = dba * ((v2->scalar - poly->minScalar) / scalarDiff) + a;
+			}
 
 			/* Delete any old crossing points */
 			if (eTemp->crossing) {
@@ -494,7 +506,7 @@ void connectCP(double s) {
 
 			/* If there are 4 crossing points we compare all crossPoints[0...3]*/
 
-			double closestDelta = 9999999;
+			double closestDelta = INT_MAX;
 			icVector3* p1 = NULL;
 			icVector3* p2 = NULL;
 			int p1I = -1;
@@ -523,7 +535,8 @@ void connectCP(double s) {
 							closestDelta = delta;
 							p1 = cp1;
 							p2 = cp2;
-						} else {
+						}
+						else {
 							p1I = j;
 							p2I = k;
 						}
@@ -531,13 +544,17 @@ void connectCP(double s) {
 				}
 			}
 
-			icVector3* cp3 = crossPoints[p1I];
-			icVector3* cp4 = crossPoints[p2I];
-
-			LineSegment line2(cp3->x, cp3->y, cp3->z, cp4->x, cp4->y, cp4->z);
-
-
 			if (p1 && p2) {
+				std::cout << "Case hit for 4 crossing points" << std::endl;
+				std::cout << p1I << " " << p2I << std::endl;
+
+				icVector3* cp3 = crossPoints[p1I];
+				icVector3* cp4 = crossPoints[p2I];
+
+				LineSegment line2(cp3->x, cp3->y, cp3->z, cp4->x, cp4->y, cp4->z);
+
+
+
 				LineSegment line(p1->x, p1->y, p1->z, p2->x, p2->y, p2->z);
 				plCountour.push_back(line);
 				plCountour.push_back(line2);
@@ -564,6 +581,8 @@ void keyboard(unsigned char key, int x, int y) {
 	// clear out lines and points
 	lines.clear();
 	points.clear();
+
+	double scale = 0.0025;
 
 	switch (key) {
 	case 27:	// set excape key to exit program
@@ -624,7 +643,7 @@ void keyboard(unsigned char key, int x, int y) {
 				classifyVector(s);
 
 				/* Calc. Crossing Points */
-				calcCrossingPoints(s);
+				calcCrossingPoints(s, 0);
 
 				/* Connect Crossing Points */
 				connectCP(s);
@@ -646,7 +665,7 @@ void keyboard(unsigned char key, int x, int y) {
 				classifyVector(s);
 
 				/* Calc. Crossing Points */
-				calcCrossingPoints(s);
+				calcCrossingPoints(s, 0);
 
 				/* Connect Crossing Points */
 				connectCP(s);
@@ -656,6 +675,180 @@ void keyboard(unsigned char key, int x, int y) {
 		glutPostRedisplay();
 		break;
 
+	case '8':	// add your own display mode
+		display_mode = 8;
+		{
+
+			int deltaScaled = (poly->maxScalar - poly->minScalar) / N;
+
+			for (double s = poly->minScalar; s <= poly->maxScalar; s += deltaScaled)
+			{
+				/* Classify Vector */
+				classifyVector(s);
+
+				/* Calc. Crossing Points */
+				calcCrossingPoints(s, 1);
+
+				/* Connect Crossing Points */
+				connectCP(s);
+
+			}
+
+		}
+		glutPostRedisplay();
+		break;
+	case '9':	// add your own display mode
+		display_mode = 9;
+		{
+
+			int deltaScaled = (poly->maxScalar - poly->minScalar) / N;
+
+			for (double s = poly->minScalar; s <= poly->maxScalar; s += deltaScaled)
+			{
+				/* Classify Vector */
+				classifyVector(s);
+
+				/* Calc. Crossing Points */
+				calcCrossingPoints(s, 1);
+
+				/* Connect Crossing Points */
+				connectCP(s);
+
+			}
+
+		}
+		glutPostRedisplay();
+		break;
+	case '0':
+		display_mode = 0;
+		{
+			int deltaScaled = (poly->maxScalar - poly->minScalar) / N;
+
+			for (double s = poly->minScalar; s <= poly->maxScalar; s += deltaScaled)
+			{
+				/* Classify Vector */
+				classifyVector(s);
+
+				/* Calc. Crossing Points */
+				calcCrossingPoints(s, 1);
+
+				/* Connect Crossing Points */
+				connectCP(s);
+
+			}
+			for (int i = 0; i < poly->nquads; i++) {
+				Quad* qTemp = poly->qlist[i];
+
+				if (qTemp->crtical) {
+					delete qTemp->crtical;
+					qTemp->crtical = NULL;
+				}
+
+				double x0,y0, x1, x2, y1, y2, fx1y1, fx1y2, fx2y2, fx2y1;
+				x1 = INT_MAX;
+				x2 = INT_MIN;
+				y1 = INT_MAX;
+				y2 = INT_MIN;
+
+				for (int j = 0; j < 4; j++)
+				{
+					Vertex* v = qTemp->verts[j];
+					// Current x is smaller than x1
+					if (v->x < x1) {
+						x1 = v->x;
+					} 
+					
+					// Current y is smaller than y1
+					if (v->y < y1) {
+						y1 = v->y;
+					}
+
+					// Current x is bigger than x2
+					if (v->x > x2) {
+						x2 = v->x;
+					}
+
+					// Current y is bigger than y2 
+					if (v->y > y2) {
+						y2 = v->y;
+					}
+				}
+
+				for (int j = 0; j < 4; j++) {
+					Vertex* v = qTemp->verts[j];
+					if (v->x == x1 && v->y == y1) {
+						fx1y1 = v->scalar;
+					}
+					if (v->x == x2 && v->y == y2) {
+						fx2y2 = v->scalar;
+					}
+					if (v->x == x1 && v->y == y2) {
+						fx1y2 = v->scalar;
+					}
+					if (v->x == x2 && v->y == y1) {
+						fx2y1 = v->scalar;
+					}
+				}
+
+				double bottom0 = (fx1y1 - fx2y1 - fx1y2 + fx2y2);
+				
+				double x0Top = (x2 * fx1y1) - (x1 * fx2y1) - (x2 * fx1y2) + (x1 * fx2y2);
+				double y0Top = (y2 * fx1y1) - (y2 * fx2y1) - (y1 * fx1y2) + (y1 * fx2y2);
+
+				x0 = x0Top / bottom0;
+				y0 = y0Top / bottom0;
+				
+				int accept = 1;
+
+				if (x0 < x1) {
+					accept = 0;
+				}
+
+				if (y0 > y2) {
+					accept = 0;
+				}
+
+				if (x0 > x2) {
+					accept = 0;
+				}
+
+				if (y0 < y1) {
+					accept = 0;
+				}
+
+				if (accept == 1) {
+
+					std::cout << "Accepted point at " << x0 << ", " << y0 << std::endl;
+					std::cout << "x1: " << x1 << " x2: " << x2 << " y1: " << y1 << " y2: " << y2 << std::endl << std::endl;
+
+					double xDelta = x2 - x1;
+					double yDelta = y2 - y1;
+
+					double z0 =
+						((x2 - x0) / (x2 - x1)) * ((y2 - y0) / (y2 - y1)) * fx1y1
+						+ ((x0 - x1) / (x2 - x1)) * ((y2 - y0) / (y2 - y1)) * fx2y1
+						+ ((x2 - x0) / (x2 - x1)) * ((y0 - y1) / (y2 - y1)) * fx1y2
+						+ ((x0 - x1) / (x2 - x1)) * ((y0 - y1) / (y2 - y1)) * fx2y2;
+
+					z0 = (SCALE_MAX - SCALE_MIN) * ((z0 - poly->minScalar) / (poly->maxScalar - poly->minScalar)) + SCALE_MIN;
+					
+					icVector3* cp = new icVector3(x0, y0, z0);
+					qTemp->crtical = cp;
+					points.push_back(*cp);
+				}
+
+				/*
+					1. Delete all old critical points
+					2. Find x1, x2, y1, y2, f(x1, y1), f(x2, y2)
+					3. Calculate x0 and y0
+					4. Check whether x0 and y0 is inside the quad
+					5. Save calc critical point if accepted
+				*/
+				
+			}
+		}
+		break;
+		
 
 	case 'r':	// reset rotation and transformation
 		mat_ident(rotmat);
@@ -1197,7 +1390,8 @@ void display_polyhedron(Polyhedron* poly)
 		glEnable(GL_LIGHT1);
 
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		GLfloat mat_diffuse[4] = { 0.24, 0.4, 0.47, 0.0 };
+		// GLfloat mat_diffuse[4] = { 0.24, 0.4, 0.47, 0.0 };
+		GLfloat mat_diffuse[4] = {0.0, 0.0, 0.0, 0.0 };
 		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
 		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
 		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
@@ -1218,11 +1412,11 @@ void display_polyhedron(Polyhedron* poly)
 		for (int k = 0; k < lines.size(); k++)
 		{
 			PolyLine line = lines[k];
-			double val = 1 - (double)(k + 1) / (double)lines.size();
+			double val = (double)(k + 1) / (double)lines.size();
 			
-			double rVal = 1 * val + 1 * val;
-			double gVal = 1 * val + 0 * val;
-			double bVal = 0 * val + 0 * val;
+			double rVal = 1 * val + 1 * (1 - val);
+			double gVal = 0 * val + 1 * (1 - val);
+			double bVal = 1 * val + 0 * (1 - val);
 
 
 			drawPolyLine(line, 1.0, rVal, gVal, bVal);
@@ -1256,6 +1450,9 @@ void display_polyhedron(Polyhedron* poly)
 			for (int j = 0; j < 4; j++) {
 				Vertex* temp_v = temp_q->verts[j];
 				glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
+
+				
+
 				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
 			}
 			glEnd();
@@ -1265,11 +1462,54 @@ void display_polyhedron(Polyhedron* poly)
 		for (int k = 0; k < lines.size(); k++)
 		{
 			PolyLine line = lines[k];
-			double val = 1 - (double)(k + 1) / (double)lines.size();
 
-			double rVal = 1 * val + 1 * val;
-			double gVal = 1 * val + 0 * val;
-			double bVal = 0 * val + 0 * val;
+			drawPolyLine(line, 1.0, 1.0, 1.0, 1.0);
+		}
+
+		// draw points
+		for (int k = 0; k < points.size(); k++)
+		{
+			icVector3 point = points[k];
+			drawDot(point.x, point.y, point.z);
+		}
+		break;
+	}
+	break;
+
+	case 9: // add your own display mode
+	{
+		glEnable(GL_LIGHTING);
+		glEnable(GL_LIGHT0);
+		glEnable(GL_LIGHT1);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		// GLfloat mat_diffuse[4] = { 0.24, 0.4, 0.47, 0.0 };
+		GLfloat mat_diffuse[4] = { 0.0, 0.0, 0.0, 0.0 };
+		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+
+		for (int i = 0; i < poly->nquads; i++) {
+			Quad* temp_q = poly->qlist[i];
+			glBegin(GL_POLYGON);
+			for (int j = 0; j < 4; j++) {
+				Vertex* temp_v = temp_q->verts[j];
+				glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
+				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+			}
+			glEnd();
+		}
+
+		// draw lines
+		for (int k = 0; k < lines.size(); k++)
+		{
+			PolyLine line = lines[k];
+			double val = (double)(k + 1) / (double)lines.size();
+
+			double rVal = 1 * val + 1 * (1 - val);
+			double gVal = 0 * val + 1 * (1 - val);
+			double bVal = 1 * val + 0 * (1 - val);
 
 
 			drawPolyLine(line, 1.0, rVal, gVal, bVal);
@@ -1283,7 +1523,52 @@ void display_polyhedron(Polyhedron* poly)
 		}
 		break;
 	}
-	break;
+	case 0:
+		{
+		glEnable(GL_LIGHTING);
+		glEnable(GL_LIGHT0);
+		glEnable(GL_LIGHT1);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		GLfloat mat_diffuse[4] = { 0.24, 0.4, 0.47, 0.0 };
+		GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+		glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+		glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+		glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+
+		for (int i = 0; i < poly->nquads; i++) {
+			Quad* temp_q = poly->qlist[i];
+			glBegin(GL_POLYGON);
+			for (int j = 0; j < 4; j++) {
+				Vertex* temp_v = temp_q->verts[j];
+				glNormal3d(temp_v->normal.entry[0], temp_v->normal.entry[1], temp_v->normal.entry[2]);
+				glVertex3d(temp_v->x, temp_v->y, temp_v->z);
+			}
+			glEnd();
+		}
+
+		// draw lines
+		for (int k = 0; k < lines.size(); k++)
+		{
+			PolyLine line = lines[k];
+			double val = (double)(k + 1) / (double)lines.size();
+
+			double rVal = 1 * val + 1 * (1 - val);
+			double gVal = 0 * val + 1 * (1 - val);
+			double bVal = 1 * val + 0 * (1 - val);
+
+
+			drawPolyLine(line, 1.0, rVal, gVal, bVal);
+		}
+
+		// draw points
+		for (int k = 0; k < points.size(); k++)
+		{
+			icVector3 point = points[k];
+			drawDot(point.x, point.y, point.z);
+		}
+		break;
+	}
 	default:
 	{
 		// don't draw anything

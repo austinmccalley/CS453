@@ -72,6 +72,8 @@ public:
 
 	icVector3 normal;
 	void *other_props;
+
+	icVector3* crtical = NULL;
 };
 
 
